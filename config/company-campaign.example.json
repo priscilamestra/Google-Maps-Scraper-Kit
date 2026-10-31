@@ -1,0 +1,14 @@
+{
+  "name": "cafes_campinas",
+  "mode": "companies",
+  "target_count": 5,
+  "business_terms": ["cafe"],
+  "location": {
+    "city": "Campinas",
+    "state": "SP",
+    "country": "BR"
+  },
+  "collect_emails": false,
+  "collect_socials": false,
+  "manual_approval_required": true
+}

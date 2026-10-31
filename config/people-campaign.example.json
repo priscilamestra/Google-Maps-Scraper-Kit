@@ -1,0 +1,13 @@
+{
+  "name": "fundadores_marketing_nova_friburgo",
+  "mode": "people",
+  "target_count": 10,
+  "business_terms": ["marketing", "agência digital"],
+  "location": {
+    "city": "Nova Friburgo",
+    "state": "RJ",
+    "country": "BR"
+  },
+  "decision_maker_roles": ["fundador", "proprietário", "diretor"],
+  "manual_approval_required": true
+}

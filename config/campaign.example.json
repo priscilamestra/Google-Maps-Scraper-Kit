@@ -1,0 +1,13 @@
+{
+  "name": "clinicas_estetica_campinas",
+  "mode": "companies_and_people",
+  "target_count": 100,
+  "business_terms": ["clinica de estetica"],
+  "location": {
+    "city": "Campinas",
+    "state": "SP",
+    "country": "BR"
+  },
+  "decision_maker_roles": ["fundador", "diretor", "gerente de marketing"],
+  "manual_approval_required": true
+}

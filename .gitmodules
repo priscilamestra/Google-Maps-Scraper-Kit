@@ -1,0 +1,3 @@
+[submodule "integrations/google-maps-scraper-kit"]
+	path = integrations/google-maps-scraper-kit
+	url = https://github.com/Mahanaicoach/google-maps-scraper-kit.git

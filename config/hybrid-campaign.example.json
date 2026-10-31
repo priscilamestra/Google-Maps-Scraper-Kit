@@ -1,0 +1,17 @@
+{
+  "name": "empresas_software_campinas",
+  "mode": "companies_and_people",
+  "target_count": 5,
+  "business_terms": ["empresa de software"],
+  "location": {
+    "city": "Campinas",
+    "state": "SP",
+    "country": "BR"
+  },
+  "decision_maker_roles": ["fundador", "diretor", "ceo", "gerente de marketing"],
+  "collect_emails": false,
+  "collect_socials": false,
+  "negative_terms": [],
+  "required_fields": ["phone"],
+  "manual_approval_required": true
+}
