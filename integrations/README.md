@@ -10,4 +10,5 @@ Cada repositório externo entra como submódulo próprio e mantém licença, his
 
 Integrações atuais:
 
-- `google-maps-scraper-kit`: fonte experimental de empresas, ainda sem prova real por falta de Docker.
+- `google-maps-scraper-kit`: Kit oficial preservado, motor e coleta real validados; porta externa 8081.
+- `google-maps-scraper` e `scrapemate`: clones oficiais de inspeção, ignorados pelo Git do produto. Exceção documentada ao fluxo de submódulos: o build obtém fontes por commits verificados e aplica um patch rastreável fora dos clones. Licenças/origens preservadas. Veja `docs/audits/engine-close-fix.md` e `infrastructure/engine/`.

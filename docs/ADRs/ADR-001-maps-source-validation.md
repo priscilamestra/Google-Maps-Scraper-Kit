@@ -9,7 +9,7 @@ O PRD escolhe o Google Maps Scraper Kit como primeira fonte de empresas. A fonte
 
 ## Decisão
 
-Manter o repositório oficial em `integrations/google-maps-scraper-kit`, sem modificar seu código. O núcleo do Leads Prospect AI conversará com ele por wrapper/API somente depois da prova mínima.
+Manter o repositório oficial em `integrations/google-maps-scraper-kit`, sem modificar seu código. O núcleo do Google Maps Scraper Kit conversará com ele por wrapper/API somente depois da prova mínima.
 
 O banco e a fila permanecem no pacote Python principal. O Kit não será copiado nem incorporado ao domínio.
 

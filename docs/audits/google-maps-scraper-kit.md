@@ -38,7 +38,7 @@ O motor concluiu a coleta sem marcar o job como finalizado, problema conhecido d
 
 ## Validação do adapter
 
-Em 31/10/2026, uma segunda campanha controlada executou o fluxo completo `queued → running → completed` pelo adapter do Leads Prospect AI:
+Em 31/10/2026, uma segunda campanha controlada executou o fluxo completo `queued → running → completed` pelo adapter do Google Maps Scraper Kit:
 
 - alvo de 3 empresas, uma consulta, profundidade 1 e sem e-mails;
 - 16 linhas brutas observadas e 3 importadas no SQLite em 81,7 s;

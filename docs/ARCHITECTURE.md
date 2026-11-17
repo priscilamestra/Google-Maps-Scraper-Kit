@@ -1,48 +1,34 @@
-# Arquitetura atual
+# Arquitetura — Google Maps Scraper Kit
 
 ```text
-frontend futuro
-      ↓ JSON/HTTP
-API local :8090 ───── revisão, resultados e exportação
-      ↓
-SQLite ─────────────── campanhas, jobs, empresas, pessoas e evidências
-      ↓
-worker persistente
-      ├─ Google Maps Kit :8081
-      ├─ websites públicos
-      └─ Tavily pública e limitada
-      ↓
-normalização → qualificação → revisão humana
+Painel existente / chat Codex / CLI
+          ↓ HTTP/JSON
+API local :8090
+          ↓
+SQLite: campanhas v2, jobs, empresas, contatos, evidências
+          ↓
+worker serial → Maps Kit :8081 → Gosom closefix1
+          ↓
+Website HTTP protegido → fallback Playwright local
+          ↓
+normalização → filtros explícitos → revisão → CSV único
 ```
 
-O pacote principal é dono das regras e dos dados. O Google Maps Scraper Kit permanece preservado em `integrations/` e é acessado por wrapper. API e scraper aceitam somente conexões locais.
+Python é dono das regras e do estado. Não há Tavily, Apify, Supabase, CRM, scoring comercial ou descoberta de pessoas no runtime. Skill/MCP do Codex são ferramentas do agente, não componentes executados automaticamente na aplicação.
 
-## Cobertura
-
-| Requisito | Estado |
+| Componente | Responsabilidade |
 |---|---|
-| Modos empresas, pessoas e híbrido | concluído |
-| Meta distribuída por termo | concluído |
-| SQLite e fila persistente | concluído |
-| Lease, retry, backoff e circuit breaker | concluído |
-| Maps oficial em Docker | concluído em `127.0.0.1:8081` |
-| Sites, e-mails e redes publicados | concluído, com falhas externas marcadas como parciais |
-| Tavily limitada e sem cobrança automática | concluído |
-| Confiança de decisores | `verified`, `likely` ou `candidate` |
-| Score e campos obrigatórios | concluído |
-| Revisão `pending/approved/rejected` | concluído |
-| API local para o painel | concluído em `127.0.0.1:8090` |
-| CSV por campanha | concluído |
-| Planilha/Sheets | opcional, não necessário para o produto |
-| Frontend | pendente em trabalho separado |
-| Outreach | fora do escopo |
+| models/db | empresas apenas; campanhas v2, histórico legado preservado sem retomada |
+| maps/normalization | wrapper do Kit, bruto e identidade observada, coordenadas/fontes |
+| website/contacts | HTTP público, até 4 tentativas de página, contatos institucionais, cache |
+| rendering | JS em processo local limitado a 20 s; fetches controlados pelo Python |
+| qualification | nome interno legado; agora somente filtros declarados e raio, sem score |
+| worker/service | Maps → sites quando solicitado; nunca enfileirar fonte comercial |
+| export | uma empresa por linha, redes/fontes/evidence_json; colunas pessoais antigas vazias |
+| api/static | interface existente; nome/opções ajustados, sem redesenho |
 
-## Limitações assumidas
+Portas: aplicação 127.0.0.1:8090; Kit 127.0.0.1:8081 → Nginx interno 8080. Apache 8080 e PostgreSQL 17/5432 preservados. Docker usa o mesmo volume de resultados.
 
-- páginas dependentes de JavaScript podem exigir futuro fallback Playwright;
-- nomes de funcionários e porte só são usados quando uma fonte pública os comprova;
-- perfis `candidate` nunca são apresentados como confirmados;
-- cancelar impede as próximas etapas, mas não interrompe no meio uma requisição externa já iniciada;
-- SQLite atende ao uso local de uma usuária; PostgreSQL só será necessário com concorrência ou implantação remota.
+Backend Playwright é uma dependência uv real e usa Edge no Windows. O navegador do Maps continua na imagem Go; são execuções distintas. Firecrawl MCP foi verificado no Codex, sem self-hosting ou credencial hospedada instalada na aplicação.
 
-Dados reais ficam em `data/` e `exports/`, fora do Git. Credenciais ficam somente no `.env` local.
+Compatibilidade: pacote `google_maps_scraper_kit`, distribuição `google-maps-scraper-kit` e tabelas legadas permanecem para preservar instalação/histórico. Nome público e diretório: Google Maps Scraper Kit. Contexto normativo: [PRD vigente](../PRD_GOOGLE_MAPS_SCRAPER_KIT.md). Validações atuais: [estado do backend](BACKEND_STATUS.md).

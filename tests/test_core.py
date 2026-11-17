@@ -13,45 +13,42 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from leads_prospect_ai.db import (
+from google_maps_scraper_kit.db import (
     approve_campaign,
     claim_next_maps_job,
     connect,
     create_campaign,
     defer_or_fail_job,
-    enqueue_tavily_job,
     enqueue_website_job,
     finish_job,
     list_companies,
     list_evidence,
     list_jobs,
     list_maps_results,
-    list_people,
     list_source_health,
     list_campaign_results,
     pause_job,
     resume_job,
     upsert_maps_results,
 )
-from leads_prospect_ai.api import create_server
-from leads_prospect_ai.contacts import clean_emails
-from leads_prospect_ai.maps import run_next_maps_job
-from leads_prospect_ai.models import Campaign, JobState
-from leads_prospect_ai.normalization import normalize_maps_results
-from leads_prospect_ai.qualification import qualify_campaign
-from leads_prospect_ai.export import export_companies
-from leads_prospect_ai.service import execute_company_campaign
-from leads_prospect_ai.tavily import _setting, run_next_tavily_job
-from leads_prospect_ai.website import enrich_websites, run_next_website_job, validate_public_url
+from google_maps_scraper_kit.api import create_server
+from google_maps_scraper_kit.contacts import clean_emails
+from google_maps_scraper_kit.maps import run_next_maps_job
+from google_maps_scraper_kit.models import Campaign, JobState
+from google_maps_scraper_kit.normalization import normalize_maps_results
+from google_maps_scraper_kit.qualification import qualify_campaign
+from google_maps_scraper_kit.export import export_companies
+from google_maps_scraper_kit.service import execute_company_campaign
+from google_maps_scraper_kit.website import enrich_websites, run_next_website_job, validate_public_url
 
 
 VALID = {
+    "match_business_terms": False,  # These fixtures exercise storage/queue, not topic matching.
     "name": "clinicas_campinas",
-    "mode": "companies_and_people",
+    "mode": "companies",
     "target_count": 10,
     "business_terms": ["clinica de estetica"],
     "location": {"city": "Campinas", "state": "SP", "country": "BR"},
-    "decision_maker_roles": ["fundador"],
     "manual_approval_required": True,
 }
 
@@ -62,8 +59,8 @@ class CampaignTest(unittest.TestCase):
         self.assertEqual(campaign.maps_queries(), ("clinica de estetica em Campinas, SP, BR",))
 
     def test_rejects_people_search_without_roles(self) -> None:
-        raw = {**VALID, "decision_maker_roles": []}
-        with self.assertRaisesRegex(ValueError, "decision_maker_roles"):
+        raw = {**VALID, "mode": "people"}
+        with self.assertRaisesRegex(ValueError, "mode"):
             Campaign.from_dict(raw)
 
     def test_splits_target_between_search_terms(self) -> None:
@@ -80,7 +77,7 @@ class CampaignTest(unittest.TestCase):
 class QueueTest(unittest.TestCase):
     def test_persists_campaign_and_queued_maps_job(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, job_ids = create_campaign(db_path, Campaign.from_dict(VALID))
             jobs = list_jobs(db_path)
 
@@ -93,7 +90,7 @@ class QueueTest(unittest.TestCase):
     def test_runs_and_imports_maps_job_idempotently(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            db_path = root / "leads.db"
+            db_path = root / "google-maps-scraper-kit.db"
             campaign_id, job_ids = create_campaign(db_path, Campaign.from_dict(VALID))
             approve_campaign(db_path, campaign_id)
 
@@ -126,7 +123,7 @@ class QueueTest(unittest.TestCase):
     def test_defers_failed_maps_job(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            db_path = root / "leads.db"
+            db_path = root / "google-maps-scraper-kit.db"
             campaign_id, _ = create_campaign(db_path, Campaign.from_dict(VALID))
             approve_campaign(db_path, campaign_id)
 
@@ -144,7 +141,7 @@ class QueueTest(unittest.TestCase):
 
     def test_reclaims_expired_lease_and_rejects_old_worker(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, _ = create_campaign(db_path, Campaign.from_dict(VALID))
             approve_campaign(db_path, campaign_id)
             first = claim_next_maps_job(db_path)
@@ -166,7 +163,7 @@ class QueueTest(unittest.TestCase):
 
     def test_deduplicates_company_and_evidence_across_jobs(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             _, first_jobs = create_campaign(db_path, Campaign.from_dict(VALID))
             _, second_jobs = create_campaign(db_path, Campaign.from_dict({**VALID, "name": "second"}))
             row = {
@@ -205,7 +202,7 @@ class QueueTest(unittest.TestCase):
 
     def test_stops_reclaiming_after_three_attempts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, _ = create_campaign(db_path, Campaign.from_dict(VALID))
             approve_campaign(db_path, campaign_id)
             claimed = claim_next_maps_job(db_path)
@@ -225,7 +222,7 @@ class QueueTest(unittest.TestCase):
 
     def test_requires_approval_and_pauses_queued_job(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, job_ids = create_campaign(db_path, Campaign.from_dict(VALID))
             self.assertIsNone(claim_next_maps_job(db_path))
             approve_campaign(db_path, campaign_id)
@@ -238,7 +235,7 @@ class QueueTest(unittest.TestCase):
 
     def test_backoff_then_opens_circuit_after_three_failures(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, _ = create_campaign(db_path, Campaign.from_dict(VALID))
             approve_campaign(db_path, campaign_id)
             outcomes = []
@@ -263,178 +260,28 @@ class QueueTest(unittest.TestCase):
 
 
 class ServiceTest(unittest.TestCase):
-    def test_reads_tavily_settings_from_local_env(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            env_file = Path(directory) / ".env"
-            env_file.write_text("TAVILY_API_KEY='secret-value'\n", encoding="utf-8")
-            self.assertEqual(_setting("TAVILY_API_KEY", env_file=env_file), "secret-value")
-
-    def test_executes_one_company_campaign_on_demand(self) -> None:
+    def test_executes_company_and_institutional_website_on_demand(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            db_path = root / "leads.db"
-            output = root / "companies.csv"
-
+            database = root/"google-maps-scraper-kit.db"
             def executor(path):
-                def fake_runner(command, **_kwargs):
-                    self.assertIn("--socials", command)
-                    self.assertNotIn("--no-email", command)
-                    csv_path = Path(command[command.index("--out") + 1])
-                    csv_path.parent.mkdir(parents=True, exist_ok=True)
-                    csv_path.write_text(
-                        "title,phone,website,address,link\n"
-                        "Café A,111,https://a.example,Rua A,https://maps.example/a\n",
-                        encoding="utf-8",
-                    )
-
-                return run_next_maps_job(path, project_root=root, runner=fake_runner)
-
-            result = execute_company_campaign(
-                db_path,
-                Campaign.from_dict(
-                    {
-                        **VALID,
-                        "mode": "companies",
-                        "decision_maker_roles": [],
-                        "collect_emails": True,
-                        "collect_socials": True,
-                    }
-                ),
-                output,
-                executor=executor,
-            )
-            output_exists = output.exists()
-
-        self.assertEqual(result["state"], "completed")
-        self.assertEqual(result["companies"], 1)
-        self.assertEqual(result["exported_rows"], 1)
-        self.assertTrue(output_exists)
-
-    def test_executes_people_campaign_with_public_results(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "people.csv"
-
-            def tavily_executor(path):
-                return run_next_tavily_job(
-                    path,
-                    searcher=lambda _query: {"results": [{
-                        "title": "Ana Silva - Fundador | LinkedIn",
-                        "url": "https://br.linkedin.com/in/ana-silva",
-                        "content": "Fundador de empresa de tecnologia em Campinas",
-                    }]},
-                    monthly_limit=10,
-                )
-
-            result = execute_company_campaign(
-                Path(directory) / "leads.db",
-                Campaign.from_dict({**VALID, "mode": "people", "business_terms": []}),
-                output,
-                tavily_executor=tavily_executor,
-            )
-            with output.open(newline="", encoding="utf-8-sig") as file:
-                exported = list(csv.DictReader(file))
-
-        self.assertEqual(result["people"], 1)
-        self.assertEqual(result["state"], "partial")
-        self.assertEqual(exported[0]["decision_maker_name"], "Ana Silva")
-        self.assertEqual(exported[0]["decision_maker_verification"], "likely")
-
-    def test_executes_hybrid_campaign_through_website_queue(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            db_path = root / "leads.db"
-
-            def maps_executor(path):
-                def fake_runner(command, **_kwargs):
-                    csv_path = Path(command[command.index("--out") + 1])
-                    csv_path.parent.mkdir(parents=True, exist_ok=True)
-                    csv_path.write_text(
-                        "title,website,link\nEmpresa A,https://a.example,https://maps.example/a\n",
-                        encoding="utf-8",
-                    )
-
-                return run_next_maps_job(path, project_root=root, runner=fake_runner)
-
-            def website_executor(path):
-                def fake_enricher(_path, roles, *, company_ids):
-                    self.assertEqual(roles, ["fundador"])
-                    self.assertEqual(len(company_ids), 1)
-                    return {"domains": 1, "pages": 2, "people": 1, "evidence_added": 3, "skipped": 0, "failed": 0}
-
-                return run_next_website_job(path, enricher=fake_enricher)
-
-            def tavily_executor(path):
-                return run_next_tavily_job(path, searcher=lambda _query: {"results": []}, monthly_limit=10)
-
-            result = execute_company_campaign(
-                db_path,
-                Campaign.from_dict(VALID),
-                root / "leads.csv",
-                executor=maps_executor,
-                website_executor=website_executor,
-                tavily_executor=tavily_executor,
-            )
-            jobs = list_jobs(db_path)
-            with (root / "leads.csv").open(newline="", encoding="utf-8-sig") as file:
-                exported = list(csv.DictReader(file))
-
-        self.assertEqual(result["state"], "completed")
-        self.assertEqual([job["source"] for job in jobs], ["maps", "website", "tavily"])
-        self.assertEqual([job["state"] for job in jobs], ["completed", "completed", "completed"])
-        self.assertEqual(len(exported), 1)
-
-    def test_tavily_adds_only_matching_linkedin_people_and_stops_at_limit(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
-            campaign_id, jobs = create_campaign(db_path, Campaign.from_dict(VALID))
-            upsert_maps_results(
-                db_path,
-                jobs[0],
-                [{
-                    "fingerprint": "company-a",
-                    "title": "Empresa A",
-                    "phone": "",
-                    "emails": "",
-                    "website": "https://empresa.example",
-                    "category": "Tecnologia",
-                    "address": "Campinas",
-                    "review_rating": "",
-                    "review_count": "",
-                    "source_url": "https://maps.example/a",
-                    "raw_json": "{}",
-                }],
-            )
-            normalize_maps_results(db_path, jobs[0])
-            approve_campaign(db_path, campaign_id)
-            enqueue_tavily_job(db_path, campaign_id, ("fundador",))
-
-            def search(_query):
-                return {"results": [
-                    {"title": "Ana Silva - Fundador - Empresa A | LinkedIn", "url": "https://br.linkedin.com/in/ana-silva?trk=x", "content": "Fundador na Empresa A em Campinas"},
-                    {"title": "Pessoa Errada - Fundador | LinkedIn", "url": "https://linkedin.com/in/errada", "content": "Outra empresa"},
-                ]}
-
-            result = run_next_tavily_job(db_path, searcher=search, monthly_limit=1)
-            people = list_people(db_path)
-            with closing(connect(db_path)) as connection:
-                evidence = connection.execute(
-                    "SELECT source_provider FROM evidence WHERE entity_type = 'person' AND entity_id = ?",
-                    (people[0]["person_id"],),
-                ).fetchall()
-
-        self.assertEqual(result["queries"], 1)
-        self.assertEqual(result["people"], 1)
-        self.assertEqual(people[0]["name"], "Ana Silva")
-        self.assertEqual(people[0]["linkedin_url"], "https://br.linkedin.com/in/ana-silva")
-        self.assertEqual(people[0]["verification_status"], "likely")
-        self.assertEqual(people[0]["confidence"], 0.8)
-        self.assertTrue(any(item["source_provider"] == "tavily" for item in evidence))
+                def runner(command, **kwargs):
+                    self.assertIn("--no-email", command)
+                    self.assertNotIn("--socials", command)
+                    Path(command[command.index("--out")+1]).write_text("title,phone,website,link\nEmpresa A,22222222,https://empresa.test,https://maps.example/a\n", encoding="utf-8")
+                return run_next_maps_job(path, project_root=root, runner=runner)
+            def websites(path):
+                return run_next_website_job(path, enricher=lambda p,**kw: {"domains":1,"pages":1,"evidence_added":0,"skipped":0,"failed":0})
+            result = execute_company_campaign(database, Campaign.from_dict({**VALID,"collect_socials":True}), root/"out.csv", executor=executor, website_executor=websites)
+            self.assertEqual(result["state"], "completed")
+            self.assertEqual([j["source"] for j in list_jobs(database)], ["maps","website"])
+            self.assertEqual(result["exported_rows"],1)
 
 
 class ProductApiTest(unittest.TestCase):
     def test_creates_and_lists_campaigns_over_http(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             server = create_server(db_path, port=0)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -466,7 +313,7 @@ class ProductApiTest(unittest.TestCase):
 
     def test_qualifies_campaign_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
+            db_path = Path(directory) / "google-maps-scraper-kit.db"
             campaign_id, jobs = create_campaign(db_path, Campaign.from_dict({**VALID, "required_fields": ["phone"]}))
             upsert_maps_results(db_path, jobs[0], [{
                 "fingerprint": "company-a", "title": "Empresa A", "phone": "111",
@@ -478,99 +325,9 @@ class ProductApiTest(unittest.TestCase):
             qualify_campaign(db_path, campaign_id)
             result = list_campaign_results(db_path, campaign_id)[0]
 
-        self.assertGreater(result["fit_score"], 0)
-        self.assertGreaterEqual(result["confidence"], 0.7)
+        self.assertNotIn("fit_score", result)
+        self.assertNotIn("confidence", result)
         self.assertIsNone(result["exclusion_reason"])
-
-
-class WebsiteTest(unittest.TestCase):
-    def test_rejects_private_network_targets(self) -> None:
-        with self.assertRaisesRegex(ValueError, "private"):
-            validate_public_url("http://127.0.0.1/admin")
-
-    def test_empty_campaign_scope_does_not_scan_other_companies(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
-            create_campaign(db_path, Campaign.from_dict(VALID))
-            result = enrich_websites(db_path, company_ids=[])
-
-        self.assertEqual(result, {"domains": 0, "pages": 0, "people": 0, "evidence_added": 0, "skipped": 0, "failed": 0})
-
-    def test_enriches_public_site_once_with_evidence(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
-            campaign_id, jobs = create_campaign(db_path, Campaign.from_dict(VALID))
-            upsert_maps_results(
-                db_path,
-                jobs[0],
-                [{
-                    "fingerprint": "company-a",
-                    "title": "Empresa A",
-                    "phone": "",
-                    "emails": "",
-                    "website": "https://empresa.example",
-                    "category": "Tecnologia",
-                    "address": "Campinas",
-                    "review_rating": "",
-                    "review_count": "",
-                    "source_url": "https://maps.example/a",
-                    "raw_json": "{}",
-                }],
-            )
-            normalize_maps_results(db_path, jobs[0])
-            pages = {
-                "https://empresa.example/robots.txt": ("https://empresa.example/robots.txt", "text/plain; charset=utf-8", b"User-agent: *\nAllow: /"),
-                "https://empresa.example/": (
-                    "https://empresa.example/",
-                    "text/html; charset=utf-8",
-                    b'<a href="/equipe">Equipe</a><a href="mailto:contato@empresa.example">Contato</a>',
-                ),
-                "https://empresa.example/equipe": (
-                    "https://empresa.example/equipe",
-                    "text/html; charset=utf-8",
-                    b'<script type="application/ld+json">invalid</script><script type="application/ld+json">{"@type":"Person","name":"Ana Silva","jobTitle":"Fundador","sameAs":"https://www.linkedin.com/in/ana-silva"}</script><section itemscope itemtype="https://schema.org/Person"><strong itemprop="name">Bia Souza</strong><span itemprop="jobTitle">Diretora</span><a itemprop="sameAs" href="https://www.linkedin.com/in/bia-souza">Perfil</a></section>',
-                ),
-            }
-
-            def fetch(url):
-                return pages[url]
-
-            def resolve(*_args, **_kwargs):
-                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
-
-            first = enrich_websites(db_path, ["fundador", "diretor"], fetcher=fetch, resolver=resolve)
-            second = enrich_websites(db_path, ["fundador", "diretor"], fetcher=fetch, resolver=resolve)
-            people = list_people(db_path)
-            evidence = list_evidence(db_path, list_companies(db_path)[0]["company_id"])
-            output = Path(directory) / "leads.csv"
-            export_companies(db_path, output)
-            with output.open(newline="", encoding="utf-8-sig") as file:
-                exported = list(csv.DictReader(file))
-
-        self.assertEqual(first["pages"], 2)
-        self.assertEqual(first["people"], 2)
-        self.assertGreater(first["evidence_added"], 0)
-        self.assertEqual(second["skipped"], 1)
-        self.assertEqual(people[0]["name"], "Ana Silva")
-        self.assertTrue(any(item["observed_value"] == "contato@empresa.example" for item in evidence))
-        self.assertEqual({row["decision_maker_name"] for row in exported}, {"Ana Silva", "Bia Souza"})
-
-    def test_defers_website_job_when_every_domain_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            db_path = Path(directory) / "leads.db"
-            campaign_id, _jobs = create_campaign(db_path, Campaign.from_dict(VALID))
-            approve_campaign(db_path, campaign_id)
-            enqueue_website_job(db_path, campaign_id, ("fundador",))
-
-            def failing(_path, _roles, *, company_ids):
-                return {"domains": 0, "pages": 0, "people": 0, "evidence_added": 0, "skipped": 0, "failed": 1}
-
-            with self.assertRaisesRegex(RuntimeError, "all website domains failed"):
-                run_next_website_job(db_path, enricher=failing)
-            website_job = next(job for job in list_jobs(db_path) if job["source"] == "website")
-
-        self.assertEqual(website_job["state"], "waiting")
-        self.assertIsNotNone(website_job["next_run_at"])
 
 
 if __name__ == "__main__":

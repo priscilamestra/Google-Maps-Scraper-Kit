@@ -6,6 +6,10 @@ __pycache__/
 .pytest_cache/
 .coverage
 
+# Read-only inspection clones; pinned builds and patches are in infrastructure/engine/.
+/integrations/google-maps-scraper/
+/integrations/scrapemate/
+
 data/*
 !data/.gitkeep
 exports/*
@@ -15,3 +19,11 @@ exports/*
 *.xlsx
 *.sqlite
 *.sqlite3
+
+# Historical planning documents kept locally only.
+/PRD_LEGACY_SCOPE.md
+/docs/archive/PRD_LEGACY_V1.1.md
+/docs/archive/REFATORACAO_GOOGLE_MAPS_SCRAPER_KIT.md
+/config/nova-friburgo-60-agencias.json
+/config/nova-friburgo-benchmark.json
+/config/nova-friburgo-ingles-benchmark.json

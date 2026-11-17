@@ -1,0 +1,158 @@
+diff --git a/adapters/fetchers/jshttp/browser_close_internal_test.go b/adapters/fetchers/jshttp/browser_close_internal_test.go
+new file mode 100644
+index 0000000..6a6501a
+--- /dev/null
++++ b/adapters/fetchers/jshttp/browser_close_internal_test.go
+@@ -0,0 +1,93 @@
++package jshttp
++
++import (
++	"sync/atomic"
++	"testing"
++	"time"
++
++	"github.com/mxschmitt/playwright-go"
++	"github.com/stretchr/testify/require"
++)
++
++// hungContext is a BrowserContext whose Close blocks until released, like a
++// context whose driver connection wedged.
++type hungContext struct {
++	playwright.BrowserContext
++	release chan struct{}
++}
++
++func (c *hungContext) Close(...playwright.BrowserContextCloseOptions) error {
++	<-c.release
++
++	return nil
++}
++
++type closeCountingBrowser struct {
++	playwright.Browser
++	closed atomic.Int64
++}
++
++func (b *closeCountingBrowser) Close(...playwright.BrowserCloseOptions) error {
++	b.closed.Add(1)
++
++	return nil
++}
++
++func withBrowserCloseTimeout(t *testing.T, d time.Duration) {
++	t.Helper()
++
++	prev := browserCloseTimeout
++	browserCloseTimeout = d
++
++	t.Cleanup(func() { browserCloseTimeout = prev })
++}
++
++func TestBrowserCloseAbandonsHungContextAndStillClosesBrowser(t *testing.T) {
++	withBrowserCloseTimeout(t, 100*time.Millisecond)
++
++	ctx := &hungContext{release: make(chan struct{})}
++	defer close(ctx.release)
++
++	b := &closeCountingBrowser{}
++	br := &browser{browser: b, ctx: ctx}
++
++	done := make(chan struct{})
++
++	go func() {
++		br.Close()
++		close(done)
++	}()
++
++	select {
++	case <-done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("browser.Close blocked on a hung context close")
++	}
++
++	require.Equal(t, int64(1), b.closed.Load())
++}
++
++func TestPageSlotPoolCloseAbandonsHungContext(t *testing.T) {
++	withBrowserCloseTimeout(t, 100*time.Millisecond)
++
++	ctx := &hungContext{release: make(chan struct{})}
++	defer close(ctx.release)
++
++	b := &closeCountingBrowser{}
++	pool := &pageSlotPool{slots: []*pageSlot{{browser: b, ctx: ctx}, {browser: b, ctx: ctx}}}
++
++	done := make(chan struct{})
++
++	go func() {
++		pool.close()
++		close(done)
++	}()
++
++	select {
++	case <-done:
++	case <-time.After(2 * time.Second):
++		t.Fatal("pageSlotPool.close blocked on a hung context close")
++	}
++
++	require.Equal(t, int64(2), b.closed.Load())
++}
+diff --git a/adapters/fetchers/jshttp/jshttp.go b/adapters/fetchers/jshttp/jshttp.go
+index 2ced968..90739a5 100644
+--- a/adapters/fetchers/jshttp/jshttp.go
++++ b/adapters/fetchers/jshttp/jshttp.go
+@@ -19,6 +19,16 @@ var _ scrapemate.HTTPFetcher = (*jsFetch)(nil)
+ // at the cost of leaking the underlying resource.
+ const closeTimeout = 5 * time.Second
+ 
++// browserCloseTimeout bounds closing a browser context or a browser the same
++// way closeTimeout bounds a page. BrowserContext.Close can block forever when
++// the driver wedges, which otherwise keeps (*jsFetch).Close, and with it
++// ScrapemateApp.Start, from returning after all results are written.
++var browserCloseTimeout = closeTimeout
++
++// driverStopTimeout bounds stopping the Playwright driver. Stopping the driver
++// is what reaps browsers whose Close was abandoned, so it gets more time.
++var driverStopTimeout = 30 * time.Second
++
+ // closeWithTimeout runs closer in a background goroutine and returns when it
+ // completes or when d elapses, whichever comes first. On timeout the goroutine
+ // is abandoned (it will finish on its own if the driver recovers). Without this
+@@ -182,7 +192,7 @@ func (o *jsFetch) Close() error {
+ 		}
+ 	}
+ 
+-	_ = o.pw.Stop()
++	closeWithTimeout(o.pw.Stop, driverStopTimeout)
+ 
+ 	return nil
+ }
+@@ -285,8 +295,8 @@ type browser struct {
+ }
+ 
+ func (o *browser) Close() {
+-	_ = o.ctx.Close()
+-	_ = o.browser.Close()
++	closeWithTimeout(func() error { return o.ctx.Close() }, browserCloseTimeout)
++	closeWithTimeout(func() error { return o.browser.Close() }, browserCloseTimeout)
+ }
+ 
+ func newBrowser(pw *playwright.Playwright, headless, disableImages bool, proxyPool *ProxyPool, ua string) (*browser, error) {
+diff --git a/adapters/fetchers/jshttp/page_slot_pool.go b/adapters/fetchers/jshttp/page_slot_pool.go
+index 0201bf2..170e6dc 100644
+--- a/adapters/fetchers/jshttp/page_slot_pool.go
++++ b/adapters/fetchers/jshttp/page_slot_pool.go
+@@ -100,11 +100,11 @@ func (p *pageSlotPool) close() {
+ 		slot.mu.Unlock()
+ 
+ 		if slot.ctx != nil {
+-			_ = slot.ctx.Close()
++			closeWithTimeout(func() error { return slot.ctx.Close() }, browserCloseTimeout)
+ 		}
+ 
+ 		if slot.browser != nil {
+-			_ = slot.browser.Close()
++			closeWithTimeout(func() error { return slot.browser.Close() }, browserCloseTimeout)
+ 		}
+ 	}
+ }

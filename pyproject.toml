@@ -3,14 +3,20 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "leads-prospect-ai"
-version = "0.1.0"
-description = "Low-cost lead discovery and qualification foundation"
+name = "google-maps-scraper-kit"
+version = "0.2.0"
+description = "Local Google Maps business extraction and institutional website enrichment"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "playwright>=1.64.1",
+]
 
 [project.scripts]
-leads-prospect = "leads_prospect_ai.cli:main"
+gmaps = "google_maps_scraper_kit.launcher:run"
+google-maps-scraper-kit = "google_maps_scraper_kit.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+google_maps_scraper_kit = ["static/*"]

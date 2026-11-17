@@ -1,0 +1,7 @@
+# Overlay only: ports, networks and gmaps_data remain owned by the official Kit compose.
+services:
+  google-maps-scraper:
+    image: google-maps-scraper-kit/maps-engine:v1.18.1-closefix1
+    build:
+      context: ../../infrastructure/engine
+    command: ["-web", "-data-folder", "/gmapsdata", "-c", "1"]
