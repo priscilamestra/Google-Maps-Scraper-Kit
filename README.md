@@ -89,7 +89,7 @@ The requested quantity is a target, not a guarantee. Availability depends on the
 ## Architecture
 
 ```text
-Web interface / CLI / local API clients
+Web interface / CLI / optional Codex chat
                     |
                     v
           Local HTTP API :8090
@@ -369,7 +369,7 @@ img/
 └── responsive-interface.png
 ```
 
-The screenshots use demonstration data and do not expose credentials, personal information, real contact datasets, or local development paths.
+The screenshots and GIF were recorded from deliberately small real Maps runs for documentation. They do not expose credentials, private datasets, or local development paths.
 
 ## Requirements
 
@@ -412,7 +412,13 @@ See [SETUP.md](SETUP.md) for the complete installation and operational constrain
 
 ## Usage
 
-On Windows, open:
+On Windows, run the application from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1
+```
+
+Alternatively, open:
 
 ```text
 ABRIR-APLICACAO.cmd
@@ -444,6 +450,28 @@ uv run google-maps-scraper-kit results CAMPAIGN_ID
 The API and web interface are the preferred operational flow.
 
 Do not start additional workers or Maps engines in parallel against the same local state.
+
+### Optional Natural-Language Operation with Codex
+
+The web interface, Python API, worker, Maps engine, website enrichment, persistence, and exports work without an AI agent or model API.
+
+Codex is an optional way to operate the same local application by chat. This repository includes [`AGENTS.md`](AGENTS.md) and the project skill at [`.agents/skills/google-maps-scraper-kit/SKILL.md`](.agents/skills/google-maps-scraper-kit/SKILL.md). They instruct Codex to translate a natural-language request into the existing local API contract instead of creating another scraper, worker, or database.
+
+To use this mode:
+
+1. Start the local application with `scripts/start-local.ps1`.
+2. Open this repository in Codex Desktop or Codex CLI while signed in to your own Codex account.
+3. Ask for a company search in natural language, including the segment, location, desired quantity, and whether to collect published emails or institutional social links.
+
+For example:
+
+```text
+Use Google Maps Scraper Kit to find 50 dental clinics in Curitiba and include published institutional emails and social links.
+```
+
+Codex uses the user's own signed-in account only to interpret and operate the request. The collection itself is still executed locally by Python, Playwright, and the Docker-based Maps engine; it does not use Codex model credits to scrape each business.
+
+The local HTTP API can also be integrated with another agent, but this repository currently provides and documents the ready-to-use agent instructions only for Codex. Authentication for any agent remains in that agent's own application and must not be stored in this project.
 
 ## API Overview
 
