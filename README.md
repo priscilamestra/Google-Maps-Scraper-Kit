@@ -11,6 +11,7 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-Frontend-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
 ![Leaflet](https://img.shields.io/badge/Leaflet-Interactive%20Map-199900?style=flat-square&logo=leaflet&logoColor=white)
 ![OpenStreetMap](https://img.shields.io/badge/OpenStreetMap-Base%20Map%20Tiles-7EBC6F?style=flat-square&logo=openstreetmap&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 Google Maps Scraper Kit is a local application for collecting business listings from Google Maps, enriching them with institutional contact information published on company websites, and producing reviewable datasets in XLSX, CSV, or JSON.
 
@@ -23,13 +24,13 @@ The project is intentionally limited to companies and institutional information.
 <p align="center">
   <img
     src="img/google-maps-scraper-kit-demo.gif"
-    alt="Google Maps Scraper Kit demo showing campaign creation, collection progress, map review, and data export"
+    alt="Recorded Google Maps Scraper Kit run showing a real campaign from configuration through collected results and map review"
     width="100%"
   >
 </p>
 
 <p align="center">
-  <em><strong>Demo.</strong> Complete workflow from campaign configuration and collection progress to map review, result validation, and structured data export.</em>
+  <em><strong>Demo.</strong> Recorded local run: a real search is configured, started, processed by the Maps engine, persisted, and opened in the result and map views.</em>
 </p>
 
 ## Problem
@@ -66,7 +67,7 @@ The requested quantity is a target, not a guarantee. Availability depends on the
 </p>
 
 <p align="center">
-  <em><strong>Figure 1.</strong> Local dashboard for configuring extraction campaigns, monitoring execution status, and accessing previously saved business lists.</em>
+  <em><strong>Figure 1.</strong> Real campaign in the local dashboard immediately after submission, with persisted status and map context.</em>
 </p>
 
 ## Key Features
@@ -88,7 +89,7 @@ The requested quantity is a target, not a guarantee. Availability depends on the
 ## Architecture
 
 ```text
-Web interface / CLI / Codex-assisted operation
+Web interface / CLI / local API clients
                     |
                     v
           Local HTTP API :8090
@@ -116,8 +117,6 @@ Web interface / CLI / Codex-assisted operation
 ```
 
 Python owns the application rules, campaign state, queue, filtering, persistence, and exports. The Maps browser remains inside the Docker engine, while website rendering uses a separate local Playwright process.
-
-Codex skills and connected tools can operate the same local API, but they are not autonomous backend components and do not provide their credentials or hosted-service access to the application.
 
 ## How It Works
 
@@ -234,7 +233,7 @@ CSV files are written through a temporary file, filesystem synchronization, and 
 </p>
 
 <p align="center">
-  <em><strong>Figure 3.</strong> Persistent campaign history with access to saved results, structured exports, visible-row copying, and protected list deletion.</em>
+  <em><strong>Figure 3.</strong> Real persisted results with XLSX, CSV, JSON, and visible-row copy actions enabled after collection.</em>
 </p>
 
 ## Reliability and Engineering Decisions
@@ -530,7 +529,6 @@ See:
 - New company collection depends on the installed Docker-based Maps engine and the availability of its external source.
 - Website enrichment depends on public websites, DNS, `robots.txt`, and compatible page behavior.
 - Map tiles and manual geocoding depend on their respective external providers and usage policies.
-- Firecrawl may be available to a Codex session, but it is not installed as an autonomous backend adapter and is not required by the application.
 - No paid proxy, lead provider, or API-credit service is required by the documented default workflow.
 - The application does not bypass CAPTCHA, authentication, source blocks, or access restrictions.
 - PostgreSQL and Apache installations on the same host are not part of this pipeline.
@@ -546,7 +544,6 @@ See:
 - Contact availability depends on what each organization publishes.
 - Older campaigns remain read-only historical records and cannot be resumed as new extractions.
 - Historical values overwritten before list snapshots were introduced cannot be reconstructed reliably.
-- The project has not been benchmarked against the newer Python 2.x engine from the upstream kit.
 - No recurring scheduler, hosted deployment, CI pipeline, or production uptime guarantee is documented.
 
 ## What This Project Demonstrates
@@ -560,3 +557,7 @@ See:
 - Defensive network and browser-automation controls
 - Transparent handling of partial results and unavailable data
 - Compatibility-aware refactoring of a system with existing local history
+
+## License
+
+This project is available under the [MIT License](LICENSE).
